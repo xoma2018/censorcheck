@@ -11,6 +11,13 @@ readonly COLOR_ORANGE="\033[33m"
 readonly COLOR_RESET="\033[0m"
 readonly CURL_SEPARATOR="--UNIQUE-SEPARATOR--"
 
+readonly DNS_SERVERS=("1.1.1.1" "8.8.8.8" "9.9.9.9")
+readonly DOH_SERVERS=(
+  "https://cloudflare-dns.com/dns-query"
+  "https://dns.google/dns-query"
+  "https://dns.quad9.net/dns-query"
+)
+
 # Default values
 TIMEOUT=5
 RETRIES=2
@@ -445,6 +452,8 @@ EOF
       printf "Protocol set to: %bHTTP and HTTPS%b\n" "$COLOR_WHITE" "$COLOR_RESET"
       ;;
   esac
+
+  check_dns_hijacking
 }
 
 read_domains_from_file() {
@@ -625,7 +634,94 @@ gather_single_domain_result() {
 
 get_domain_ip() {
   local domain=$1
-  nslookup "$domain" 2>/dev/null | awk '/^Address: / && !/#/ {print $2; exit}' || true
+  local ip
+  nslookup "$domain" | awk '/^Address: / && !/#/ {print $2; exit}' || true
+}
+
+get_domain_ips_via_dns() {
+  local domain=$1
+  local server=$2
+  local output
+
+  if [[ -n "$server" ]]; then
+    output=$(nslookup "$domain" "$server" 2>/dev/null)
+  else
+    output=$(nslookup "$domain" 2>/dev/null)
+  fi
+
+  awk '/Address:/ && !/#/ && !/[:].*[:]/ {print $2}' <<<"$output" || true
+}
+
+get_domain_ips_via_doh() {
+  local domain=$1
+  local doh_server=$2
+
+  curl -s -H "accept: application/dns-json" \
+    "${doh_server}?name=${domain}&type=A" |
+    jq -r '.Answer[]?.data // empty' 2>/dev/null
+}
+
+have_ip_intersection() {
+  local -n first_ips=$1
+  local -n second_ips=$2
+
+  declare -A ip_set=()
+  local ip
+
+  for ip in "${first_ips[@]}"; do
+    ip_set["$ip"]=1
+  done
+
+  for ip in "${second_ips[@]}"; do
+    [[ -n ${ip_set["$ip"]+1} ]] && return 0
+  done
+
+  return 1
+}
+
+check_dns_hijacking() {
+  local test_domains=("rutracker.org" "linkedin.com" "flibusta.is")
+  local regular_dns_ips=()
+  local doh_ips=()
+  local hijacked_domain=""
+  local hijacked_ip=""
+
+  for test_domain in "${test_domains[@]}"; do
+    regular_dns_ips=()
+    doh_ips=()
+
+    for dns_server in "${DNS_SERVERS[@]}"; do
+      mapfile -t regular_dns_ips < <(get_domain_ips_via_dns "$test_domain" "$dns_server")
+      [[ ${#regular_dns_ips[@]} -gt 0 ]] && break
+    done
+
+    for doh_server in "${DOH_SERVERS[@]}"; do
+      mapfile -t doh_ips < <(get_domain_ips_via_doh "$test_domain" "$doh_server")
+      [[ ${#doh_ips[@]} -gt 0 ]] && break
+    done
+
+    [[ ${#regular_dns_ips[@]} -eq 0 ]] || [[ ${#doh_ips[@]} -eq 0 ]] && continue
+
+    if ! have_ip_intersection regular_dns_ips doh_ips; then
+      hijacked_domain="$test_domain"
+      hijacked_ip="${regular_dns_ips[0]}"
+      break
+    fi
+  done
+
+  if [[ -n "$hijacked_domain" ]]; then
+    printf "\n%b%s%b %s %b%s%b %s %b%s%b\n\n" \
+      "$COLOR_RED" "DNS hijacking detected!" "$COLOR_RESET" \
+      "ISP redirects" "$COLOR_WHITE" "$hijacked_domain" "$COLOR_RESET" "to" \
+      "$COLOR_RED" "$hijacked_ip" "$COLOR_RESET"
+
+    printf "%b%s%b\n%b%s%b\n" \
+      "$COLOR_ORANGE" "DNS hijacking may affect the accuracy of this check" "$COLOR_RESET" \
+      "$COLOR_ORANGE" "Configure encrypted DNS (DoH/DoT) on your system" "$COLOR_RESET"
+  else
+    printf "\n%b%s%b\n" \
+      "$COLOR_GREEN" "Good news, no DNS hijacking detected!" "$COLOR_RESET"
+  fi
 }
 
 is_ip_reachable() {

@@ -148,7 +148,7 @@ Contributions are welcome! Feel free to submit pull requests to add new domains 
 
 ## TODO
 
-- [ ] DNS spoofing detection by ISP or hosting provider
-- [ ] Results table
+- [x] DNS spoofing detection by ISP or hosting provider
+- [x] Results table
 - [x] JSON output
 - [ ] Debug mode

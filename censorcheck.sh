@@ -38,7 +38,6 @@ readonly DPI_BLOCKED_SITES=(
   "x.com"
   "linkedin.com"
   "rutracker.org"
-  "nnmclub.to"
   "digitalocean.com"
   # "ntc.party"
   "amnezia.org"

@@ -858,16 +858,23 @@ summarize_protocol_result() {
 
 add_text_result_row() {
   local service=$1
-  local http_cell=$2
-  local https_cell=$3
+  local ip=$2
+  local http_cell=$3
+  local https_cell=$4
 
-  TEXT_RESULTS+=("$(jq -n --arg service "$service" --arg http "$http_cell" --arg https "$https_cell" '
-    {service: $service, http: $http, https: $https}
-  ')")
+  TEXT_RESULTS+=("$(
+    jq -n \
+      --arg service "$service" \
+      --arg ip "$ip" \
+      --arg http "$http_cell" \
+      --arg https "$https_cell" \
+      '{service: $service, ip: $ip, http: $http, https: $https}'
+  )")
 }
 
 add_text_result_from_json() {
   local result_json=$1
+  local ip=$2
   local service
   service=$(echo "$result_json" | jq -r '.service')
   local http_cell https_cell
@@ -875,15 +882,16 @@ add_text_result_from_json() {
   http_cell=$(summarize_protocol_result "$result_json" "http")
   https_cell=$(summarize_protocol_result "$result_json" "https")
 
-  add_text_result_row "$service" "$http_cell" "$https_cell"
+  add_text_result_row "$service" "$ip" "$http_cell" "$https_cell"
 }
 
 print_table_results() {
   printf "\n"
   {
-    printf "\033[1m%b%s\t%s\t%s%b\033[0m\n" \
+    printf "\033[1m%b%s\t%s\t%s\t%s%b\033[0m\n" \
       "$COLOR_WHITE" \
       "Service" \
+      "IP" \
       "HTTP" \
       "HTTPS" \
       "$COLOR_RESET"
@@ -891,12 +899,14 @@ print_table_results() {
     for row_json in "${TEXT_RESULTS[@]}"; do
       local service http https
       service=$(jq -r '.service' <<<"$row_json")
+      ip=$(jq -r '.ip' <<<"$row_json")
       http=$(jq -r '.http' <<<"$row_json")
       https=$(jq -r '.https' <<<"$row_json")
 
-      printf "%s%b\t%s\t%s\n" \
+      printf "%s%b\t%s\t%s\t%s\n" \
         "$service" \
         "$COLOR_RESET" \
+        "$ip" \
         "$(colorize_summary "$http")" \
         "$(colorize_summary "$https")"
     done
@@ -933,7 +943,7 @@ run_checks_and_print() {
       if $JSON_OUTPUT; then
         all_results_json=$(echo "$all_results_json" | jq --argjson item "$(make_json_error "$domain" nxdomain)" '. + [$item]')
       else
-        add_text_result_row "$domain" "Domain does not exist" "Domain does not exist"
+        add_text_result_row "$domain" "N/A" "Domain does not exist" "Domain does not exist"
       fi
       continue
     fi
@@ -942,7 +952,7 @@ run_checks_and_print() {
       if $JSON_OUTPUT; then
         all_results_json=$(echo "$all_results_json" | jq --argjson item "$(make_json_error "$domain" blocked_by_ip)" '. + [$item]')
       else
-        add_text_result_row "$domain" "Blocked by IP" "Blocked by IP"
+        add_text_result_row "$domain" "$ip_address" "Blocked by IP" "Blocked by IP"
       fi
       continue
     fi
@@ -953,7 +963,7 @@ run_checks_and_print() {
     if $JSON_OUTPUT; then
       all_results_json=$(echo "$all_results_json" | jq --argjson item "$domain_result_json" '. + [$item]')
     else
-      add_text_result_from_json "$domain_result_json"
+      add_text_result_from_json "$domain_result_json" "$ip_address"
     fi
   done
 

@@ -45,6 +45,8 @@ readonly DPI_BLOCKED_SITES=(
   "whatsapp.com"
   "github.com"
   "jetbrains.com"
+  "steampowered.com"
+  "bestchange.net"
   # "ntc.party"
   "amnezia.org"
   "getoutline.org"

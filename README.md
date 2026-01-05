@@ -41,7 +41,7 @@ The script contains predefined lists of websites commonly affected by:
 For local usage, download the script:
 
 ```bash
-wget https://github.com/vernette/censorcheck/raw/master/censorcheck.sh
+wget https://github.com/xoma2018/censorcheck/raw/master/censorcheck.sh
 chmod +x censorcheck.sh
 ```
 
@@ -73,7 +73,7 @@ chmod +x censorcheck.sh
 You could run the script directly from GitHub:
 
 ```bash
-bash <(wget -qO- https://github.com/vernette/censorcheck/raw/master/censorcheck.sh) --mode dpi
+bash <(wget -qO- https://github.com/xoma2018/censorcheck/raw/master/censorcheck.sh) --mode dpi
 ```
 
 All options available in the help message (`-h, --help`) can be used and combined.

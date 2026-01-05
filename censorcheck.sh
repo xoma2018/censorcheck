@@ -492,7 +492,7 @@ execute_curl() {
     -o /dev/null
     -w "%{http_code}${CURL_SEPARATOR}%{redirect_url}"
     --retry-connrefused
-    --retry-all-errors
+    
     --retry "$RETRIES"
     --connect-timeout "$TIMEOUT"
     --max-time "$TIMEOUT"
